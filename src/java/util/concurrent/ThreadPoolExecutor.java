@@ -285,6 +285,16 @@ import java.util.*;
  * @since 1.5
  * @author Doug Lea
  */
+
+/**
+ * Executor 线程池顶级接口
+ * ExecutorService 对Executor做了一些拓展，增加了一些新功能
+ * ScheduledExecutorService 对ExecutorService做了一些扩展，增加了一些定时任务相关的功能
+ * AbstractExecutorService 抽象类，运用模版方法模式实现了一些方法
+ * ThreadPoolExecutor 普通线程池类，包含最基本的线程池操作相关的方法实现
+ * Executors 线程池工具类，定义了一些快速实现线程池的方法，阿里规范手册禁止使用
+ *
+ */
 public class ThreadPoolExecutor extends AbstractExecutorService {
     /**
      * The main pool control state, ctl, is an atomic integer packing
