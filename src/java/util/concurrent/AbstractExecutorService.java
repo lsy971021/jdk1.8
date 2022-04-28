@@ -146,6 +146,9 @@ public abstract class AbstractExecutorService implements ExecutorService {
         int ntasks = tasks.size();
         if (ntasks == 0)
             throw new IllegalArgumentException();
+        /**
+         * 将任务放入队列
+         */
         ArrayList<Future<T>> futures = new ArrayList<Future<T>>(ntasks);
         ExecutorCompletionService<T> ecs =
             new ExecutorCompletionService<T>(this);
@@ -209,6 +212,14 @@ public abstract class AbstractExecutorService implements ExecutorService {
         }
     }
 
+    /**
+     * 拿到所有的任务进行执行
+     * @param tasks
+     * @return
+     * @param <T>
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
     public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
         throws InterruptedException, ExecutionException {
         try {
@@ -225,6 +236,13 @@ public abstract class AbstractExecutorService implements ExecutorService {
         return doInvokeAny(tasks, true, unit.toNanos(timeout));
     }
 
+    /**
+     * 任务执行
+     * @param tasks
+     * @return
+     * @param <T>
+     * @throws InterruptedException
+     */
     public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
         throws InterruptedException {
         if (tasks == null)
@@ -233,15 +251,33 @@ public abstract class AbstractExecutorService implements ExecutorService {
         boolean done = false;
         try {
             for (Callable<T> t : tasks) {
+                /**
+                 * 对每个任务创建一个futureTask（实现runnable:具体执行逻辑 和 future：可对runnable的动作观察和操作）
+                 */
                 RunnableFuture<T> f = newTaskFor(t);
+                /**
+                 * 往队列里添加RunnableFuture
+                 */
                 futures.add(f);
+                /**
+                 * 顶级父类接口，任务执行
+                 */
                 execute(f);
             }
+            /**
+             * 遍历每一个futureTask，判断任务是否执行完成
+             */
             for (int i = 0, size = futures.size(); i < size; i++) {
                 Future<T> f = futures.get(i);
                 if (!f.isDone()) {
                     try {
+                        /**
+                         * 阻塞获等待任务返回，若取消任务则捕获不处理
+                         */
                         f.get();
+                        /**
+                         * 捕获两种异常，任务进行取消操作，且不停止对任务的遍历（用于取消任务）
+                         */
                     } catch (CancellationException ignore) {
                     } catch (ExecutionException ignore) {
                     }
@@ -250,6 +286,9 @@ public abstract class AbstractExecutorService implements ExecutorService {
             done = true;
             return futures;
         } finally {
+            /**
+             * 任务非正常结束（抛出异常，非上面的两个异常），则对取消所有任务的进行
+             */
             if (!done)
                 for (int i = 0, size = futures.size(); i < size; i++)
                     futures.get(i).cancel(true);

@@ -93,6 +93,11 @@ package java.util.concurrent;
  * @author Doug Lea
  * @param <V> The result type returned by this Future's {@code get} method
  */
+
+/**
+ * 对runnable的动作进行观察和操作
+ * @param <V>
+ */
 public interface Future<V> {
 
     /**
@@ -116,6 +121,13 @@ public interface Future<V> {
      * typically because it has already completed normally;
      * {@code true} otherwise
      */
+    /**
+     * 试图取消此任务的执行。如果任务已经完成、已经被取消或由于其他原因无法取消，则此尝试将失败。
+     * 如果成功，并且当{@code cancel}被调用时这个任务还没有开始，这个任务应该永远不会运行。
+     * 如果任务已经开始，那么参数{@code mayInterruptIfRunning}决定是否应该中断正在执行该任务的线程以停止该任务。
+     * @param mayInterruptIfRunning
+     * @return
+     */
     boolean cancel(boolean mayInterruptIfRunning);
 
     /**
@@ -134,6 +146,10 @@ public interface Future<V> {
      * {@code true}.
      *
      * @return {@code true} if this task completed
+     */
+    /**
+     * 如果任务执行完成返回true
+     * @return
      */
     boolean isDone();
 
