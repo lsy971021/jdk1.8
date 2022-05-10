@@ -385,7 +385,10 @@ public class FutureTask<V> implements RunnableFuture<V> {
                 break;
             }
         }
-
+        /**
+         * done入口
+         * @see ExecutorCompletionService#submit(Callable)
+         */
         done();
 
         callable = null;        // to reduce footprint

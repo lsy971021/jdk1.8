@@ -111,12 +111,20 @@ public class ExecutorCompletionService<V> implements CompletionService<V> {
 
     /**
      * FutureTask extension to enqueue upon completion
+     * 装饰者模式
+     * done()为新增功能
      */
     private class QueueingFuture extends FutureTask<Void> {
         QueueingFuture(RunnableFuture<V> task) {
             super(task, null);
             this.task = task;
         }
+
+        /**
+         * 向completionQueue队列中添加任务
+         * 在取消时候会被调用
+         * @see FutureTask#cancel(boolean)
+         */
         protected void done() { completionQueue.add(task); }
         private final Future<V> task;
     }
@@ -178,6 +186,9 @@ public class ExecutorCompletionService<V> implements CompletionService<V> {
     public Future<V> submit(Callable<V> task) {
         if (task == null) throw new NullPointerException();
         RunnableFuture<V> f = newTaskFor(task);
+        /**
+         * new QueueingFuture(f)  装饰器模式，动态的给f增加新功能
+         */
         executor.execute(new QueueingFuture(f));
         return f;
     }
@@ -189,10 +200,20 @@ public class ExecutorCompletionService<V> implements CompletionService<V> {
         return f;
     }
 
+    /**
+     * 一直阻塞，知道拿到数据为止（一般有中断异常的都是阻塞执行）
+     * @return
+     * @throws InterruptedException
+     */
     public Future<V> take() throws InterruptedException {
         return completionQueue.take();
     }
 
+    /**
+     * 尝试那一下数据，如果拿不到则返回null
+     * 除了加了时间，一般都是非阻塞的
+     * @return
+     */
     public Future<V> poll() {
         return completionQueue.poll();
     }
