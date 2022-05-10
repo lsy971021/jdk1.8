@@ -162,6 +162,11 @@ public class FutureTask<V> implements RunnableFuture<V> {
     }
 
     public boolean cancel(boolean mayInterruptIfRunning) {
+        /**
+         * state == NEW 为刚创建出来的对象 的状态
+         * 若任务已完成则会返回false
+         * @see this#set(Object)
+         */
         if (!(state == NEW &&
               UNSAFE.compareAndSwapInt(this, stateOffset, NEW,
                   mayInterruptIfRunning ? INTERRUPTING : CANCELLED)))
