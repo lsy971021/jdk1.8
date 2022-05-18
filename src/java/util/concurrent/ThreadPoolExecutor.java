@@ -1285,7 +1285,13 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
                 AccessController.getContext();
         this.corePoolSize = corePoolSize;
         this.maximumPoolSize = maximumPoolSize;
+        /**
+         * 当任务队列满了且没有线程可执行任务，对新来的任务执行 策略 handler
+         */
         this.workQueue = workQueue;
+        /**
+         * 非核心线程没有执行任务时的存活时间
+         */
         this.keepAliveTime = unit.toNanos(keepAliveTime);
         this.threadFactory = threadFactory;
         this.handler = handler;
