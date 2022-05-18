@@ -609,6 +609,7 @@ public class Executors {
             if (t.isDaemon())
             /**
              * 设置为非守护线程
+             * 若为守护线程，任务被中断时才会执行任务？
              */
                 t.setDaemon(false);
             if (t.getPriority() != Thread.NORM_PRIORITY)
