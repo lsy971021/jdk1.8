@@ -1393,6 +1393,9 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      */
 
     /**
+     * 当前运行线程数小于核心线程数时，将任务添加到核心线程中
+     * 当前运行线程数不小于核心线程数时，将任务添加到队列中
+     * 当前运行线程数不小于核心线程数时，且任务队列中已满时执行方法最后一个if语句（拒绝策略）
      * @param command the runnable task   提交一个任务
      */
     public void execute(Runnable command) {
@@ -1406,9 +1409,11 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         int c = ctl.get();
         // 若工作线程数小于核心线程数，则创建新的线程，并把当前任务 command 作为这个线程的第一个任务
         if (workerCountOf(c) < corePoolSize) {
+            //添加到worker中并标记为核心线程，  对应下面的添加非核心线程数
             if (addWorker(command, true)) {
                 return;
             }
+            //如果多个任务并发的往里面添加，有一些任务没有添加成功（可能因为并发时候后面的线程添加是大于核心线程数），则在获取一次
             c = ctl.get();
         }
         /**
@@ -1421,13 +1426,20 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         if (isRunning(c) && workQueue.offer(command)) {
             // 再次检查线程池标记
             int recheck = ctl.get();
+            // 再次检查，可能线程运行到这时外部已经关闭了，所以要再次检查
             // 如果线程池已不处于 RUNNING 状态，那么移除已入队的任务，并且执行拒绝策略
             if (!isRunning(recheck) && remove(command)) {
                 // 任务添加到阻塞队列失败，执行拒绝策略
                 reject(command);
             }
-            // 如果线程池还是 RUNNING 的，并且线程数为 0，那么开启新的线程
+            /**
+             * 如果线程池还是 RUNNING 的，并且线程数为 0，那么开启新的线程
+             * （核心线程数+非核心线程数）为 0 的原因：
+             * 虽然设置了核心线程数，也可能睡眠。 可能调用了
+             * @see {{@link #allowCoreThreadTimeOut(boolean)}}    允许核心线程超市
+             */
             else if (workerCountOf(recheck) == 0) {
+                //添加到worker中并标记为非核心线程
                 addWorker(null, false);
             }
         }
