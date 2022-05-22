@@ -941,12 +941,23 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      *                  state).
      * @return true if successful
      */
+
+    /**
+     * 根据当前池状态和给定的边界(核心或最大值)检查是否可以添加一个新的worker。
+     * 如果是这样，worker计数将相应地调整，如果可能，将创建并启动一个新的worker，并将firstTask作为其第一个任务运行。
+     * 如果池已停止或有资格关闭，则此方法返回false。如果线程工厂在请求时未能创建线程，它还返回false。
+     * 如果线程创建失败，要么是由于线程工厂返回null，要么是由于异常(通常是thread .start()中的OutOfMemoryError))，我们会干净地回滚。
+     * cas + 快照
+     */
     private boolean addWorker(Runnable firstTask, boolean core) {
         retry:
         for (; ; ) {
             int c = ctl.get();
+            // 运行时状态
             int rs = runStateOf(c);
-
+            /**
+             * 如果 线程池已经结束了(SHUTDOWN、STOP、TIDYING)   且 !(线程池为SHUTDOWN 且 新提交的任务为null 且 队列不为空)
+             */
             // Check if queue empty only if necessary.
             if (rs >= SHUTDOWN && !(rs == SHUTDOWN && firstTask == null && !workQueue.isEmpty())) {
                 return false;
