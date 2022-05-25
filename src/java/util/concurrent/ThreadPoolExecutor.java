@@ -1105,13 +1105,24 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * @param completedAbruptly if the worker died due to user exception
      */
     private void processWorkerExit(Worker w, boolean completedAbruptly) {
+        /**
+         * completedAbruptly 为true是因为用户造成的异常
+         */
         if (completedAbruptly) // If abrupt, then workerCount wasn't adjusted
+        /**
+         * 当为用户造成的异常时 工作线程数量减一
+         */
             decrementWorkerCount();
 
         final ReentrantLock mainLock = this.mainLock;
+        // 保证原子性
         mainLock.lock();
         try {
             completedTaskCount += w.completedTasks;
+            /**
+             * 从工人组中移除该工人
+             * 可参考：{@link Worker} 构造函数
+             */
             workers.remove(w);
         } finally {
             mainLock.unlock();
@@ -1120,14 +1131,33 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         tryTerminate();
 
         int c = ctl.get();
+        /**
+         * 当为 running（可放任务也可拿任务）  或  shutdown（不可放任务，可拿任务） 时
+         */
         if (runStateLessThan(c, STOP)) {
+            /**
+             * completedAbruptly ： 是否因为用户线程异常导致的
+             */
             if (!completedAbruptly) {
+                /**
+                 * 到这里为正常情况下
+                 * allowCoreThreadTimeOut  是否允许核心线程数超时
+                 */
                 int min = allowCoreThreadTimeOut ? 0 : corePoolSize;
+                /**
+                 * 保证队列不为空
+                 */
                 if (min == 0 && !workQueue.isEmpty())
                     min = 1;
+                /**
+                 * 是否至少有一个线程在执行任务
+                 */
                 if (workerCountOf(c) >= min)
                     return; // replacement not needed
             }
+            /**
+             * 是用户线程异常导致的 则添加一个新的worker
+             */
             addWorker(null, false);
         }
     }
@@ -1175,7 +1205,11 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
             }
 
             try {
-                Runnable r = timed ? workQueue.poll(keepAliveTime, TimeUnit.NANOSECONDS) : workQueue.take();
+                /**
+                 * workQueue.take() 为阻塞方法，且会抛出中断异常
+                 */
+                Runnable r = timed ?
+                        workQueue.poll(keepAliveTime, TimeUnit.NANOSECONDS) : workQueue.take();
                 if (r != null)
                     return r;
                 timedOut = true;
@@ -1232,8 +1266,9 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
     /**
      * 一直执行任务
      * 获取线程池中线程执行的异常：
-     *      1、重写钩子函数 ：afterExecute(task, thrown);       thrown为异常
-     *      2、future去get()
+     * 1、重写钩子函数 ：afterExecute(task, thrown);       thrown为异常
+     * 2、future去get()
+     *
      * @param w
      */
     final void runWorker(Worker w) {
@@ -1249,7 +1284,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         try {
             /**
              * task != null ： 为第一次执行for循环
-             * task = getTask() ： 从任务队列中去拿
+             * task = getTask() ： 从任务队列中去拿,如果没有就会阻塞住（从阻塞队列中拿任务，如果中断会抛出中断异常，但有捕捉），直到放入下一个任务
              */
             while (task != null || (task = getTask()) != null) {
                 /**
@@ -1263,12 +1298,12 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
                  */
                 if (
                         (
-                            runStateAtLeast(ctl.get(), STOP)
-                            ||
-                            (Thread.interrupted() && runStateAtLeast(ctl.get(), STOP))
+                                runStateAtLeast(ctl.get(), STOP)
+                                        ||
+                                        (Thread.interrupted() && runStateAtLeast(ctl.get(), STOP))
                         )
-                        &&
-                        !wt.isInterrupted()) {
+                                &&
+                                !wt.isInterrupted()) {
                     /**
                      * 设置中断
                      */
@@ -1311,8 +1346,18 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
                     w.unlock();
                 }
             }
+            /**
+             * 若在  afterExecute(task, thrown) 、 beforeExecute(wt, task);
+             * 抛出异常也会直接进入finally里  不会执行下面这个代码，因为afterExecute和beforeExecute 这两个方法没被catch
+             * 若 completedAbruptly=true 则是引用用户引发的异常（afterExecute和beforeExecute被重写中有异常，getTask()中异常会被捕捉，所以不会有异常）
+             *
+             * 当线程中断时会进入这里
+             */
             completedAbruptly = false;
         } finally {
+            /**
+             * afterExecute和beforeExecute 会抛出异常进入这里（用户自己抛出的异常）
+             */
             processWorkerExit(w, completedAbruptly);
         }
     }
