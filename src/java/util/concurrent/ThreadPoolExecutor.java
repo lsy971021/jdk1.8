@@ -736,6 +736,10 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
     private void advanceRunState(int targetState) {
         for (; ; ) {
             int c = ctl.get();
+            // runStateAtLeast(c, targetState)：
+            //      当前的状态（c）至少是目标状态（targetState），若是 则break
+            // ctl.compareAndSet(c, ctlOf(targetState, workerCountOf(c)))：
+            //      修改当前状态，若成功则break，否则继续执行循环，直到成功
             if (runStateAtLeast(c, targetState) ||
                     ctl.compareAndSet(c, ctlOf(targetState, workerCountOf(c))))
                 break;
@@ -752,26 +756,50 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * from the queue during shutdown. The method is non-private to
      * allow access from ScheduledThreadPoolExecutor.
      */
+    /**
+     * 线程池被shutdown等时所有线程都会执行此方法
+     */
     final void tryTerminate() {
         for (; ; ) {
             int c = ctl.get();
+            /**
+             * isRunning(c)： 判断当前线程池是不是running状态
+             * runStateAtLeast(c, TIDYING) ： 当前线程池运行状态是否正在执行TIDYING钩子函数
+             * runStateOf(c) ： 当前线程池状态
+             */
             if (isRunning(c) ||
                     runStateAtLeast(c, TIDYING) ||
                     (runStateOf(c) == SHUTDOWN && !workQueue.isEmpty()))
                 return;
+            /**
+             * 此时队列已经为空
+             * workerCountOf(c) != 0 ： 仍有线程正在活动
+             * workerCountOf(c)==0 表示当前线程就是最后一个线程
+             */
             if (workerCountOf(c) != 0) { // Eligible to terminate
+                /**
+                 * 只中断一个空闲线程（因为队列已经为空，如果中断所有的，就没有线程会执行下面的代码，即下面的代码只有一个线程时才执行）
+                 */
                 interruptIdleWorkers(ONLY_ONE);
                 return;
             }
-
+            /**
+             * 此时只有一个线程会执行到这
+             */
             final ReentrantLock mainLock = this.mainLock;
             mainLock.lock();
             try {
+                /**
+                 * 把最后一个线程状态变为tidying，然后执行terminated()方法，执行完后再把状态变为TERMINATED
+                 */
                 if (ctl.compareAndSet(c, ctlOf(TIDYING, 0))) {
                     try {
                         terminated();
                     } finally {
                         ctl.set(ctlOf(TERMINATED, 0));
+                        /**
+                         * 唤醒所有等待TERMINATED的线程（等待的就是变为TERMINATED的所有线程）
+                         */
                         termination.signalAll();
                     }
                     return;
@@ -871,6 +899,9 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * remember what the boolean argument means.
      */
     private void interruptIdleWorkers() {
+        /**
+         * false 只对一个线程中断
+         */
         interruptIdleWorkers(false);
     }
 
@@ -917,7 +948,15 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
     private List<Runnable> drainQueue() {
         BlockingQueue<Runnable> q = workQueue;
         ArrayList<Runnable> taskList = new ArrayList<Runnable>();
+        /**
+         * q.drainTo(taskList); 和 下面的 代码操作是一样的，
+         * 只不过队列为延迟队列或其他情况下（如继承阻塞队列并未重写此方法时）q.drainTo(taskList)可能会失败，
+         * 所以需要再手动删除并添加到列表中
+         */
         q.drainTo(taskList);
+        /**
+         * 如果任务队列不为空，则将任务移除并添加到列表里面
+         */
         if (!q.isEmpty()) {
             for (Runnable r : q.toArray(new Runnable[0])) {
                 if (q.remove(r))
@@ -1187,6 +1226,9 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
             int rs = runStateOf(c);
 
             // Check if queue empty only if necessary.
+            /**
+             * 线程状态为shutdown等一系列退出状态时，且线程状态至少是stop或者任务队列为空时，对工作线程进行减一，并返回null
+             */
             if (rs >= SHUTDOWN && (rs >= STOP || workQueue.isEmpty())) {
                 decrementWorkerCount();
                 return null;
@@ -1206,7 +1248,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
 
             try {
                 /**
-                 * workQueue.take() 为阻塞方法，且会抛出中断异常
+                 * workQueue.take() 为阻塞方法，且会抛出中断异常（当执行shutdown等一系列关闭操作时会抛出中断异常，进入catch中）
                  */
                 Runnable r = timed ?
                         workQueue.poll(keepAliveTime, TimeUnit.NANOSECONDS) : workQueue.take();
@@ -1214,6 +1256,9 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
                     return r;
                 timedOut = true;
             } catch (InterruptedException retry) {
+                /**
+                 * 此时设置timeOut为false后重新执行for循环
+                 */
                 timedOut = false;
             }
         }
@@ -1624,13 +1669,28 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      *
      * @throws SecurityException {@inheritDoc}
      */
+    /**
+     * 对比 shutdownNow()
+     * 不接收新任务，但执行queue任务
+     */
     public void shutdown() {
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
             checkShutdownAccess();
+            /**
+             * 改变状态（用cas）
+             */
             advanceRunState(SHUTDOWN);
+            /**
+             * 中断空闲线程（因为不接收新任务，但是还执行queue任务，所以只把空闲的线程中断，剩下的线程执行queue任务）
+             * @see {{@link #runWorker(Worker)}}   - >  (task = getTask()) != null ： 如果有空闲线程会被阻塞到这
+             * 当中断空闲线程后 {@link #getTask()}  - > workQueue.take() : 会从这里的阻塞退出
+             */
             interruptIdleWorkers();
+            /**
+             * 钩子函数，子类可重写
+             */
             onShutdown(); // hook for ScheduledThreadPoolExecutor
         } finally {
             mainLock.unlock();
@@ -1655,14 +1715,31 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      *
      * @throws SecurityException {@inheritDoc}
      */
+    /**
+     * 对比 shutdown()
+     * 不接收新任务，也不执行queue队列任务
+     * @return
+     */
     public List<Runnable> shutdownNow() {
         List<Runnable> tasks;
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
+            /**
+             * 用于检测权限，不用管
+             */
             checkShutdownAccess();
+            /**
+             * 不接收新任务，也不执行queue队列任务
+             */
             advanceRunState(STOP);
+            /**
+             * 中断所有线程（既然不接收新任务，也不执行queue队列任务，所以所有线程都要被中断）
+             */
             interruptWorkers();
+            /**
+             * 因为不接收新任务，也不执行queue队列任务，所以把没有被执行的任务从队列里取出来，并返回
+             */
             tasks = drainQueue();
         } finally {
             mainLock.unlock();
@@ -1695,6 +1772,13 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         return runStateAtLeast(ctl.get(), TERMINATED);
     }
 
+    /**
+     * 等待线程池关闭
+     * @param timeout
+     * @param unit
+     * @return
+     * @throws InterruptedException
+     */
     public boolean awaitTermination(long timeout, TimeUnit unit)
             throws InterruptedException {
         long nanos = unit.toNanos(timeout);
@@ -1702,6 +1786,9 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         mainLock.lock();
         try {
             for (; ; ) {
+                /**
+                 * 查看线程池状态是否为TERMINATED，等待的时间是否小于0
+                 */
                 if (runStateAtLeast(ctl.get(), TERMINATED))
                     return true;
                 if (nanos <= 0)
