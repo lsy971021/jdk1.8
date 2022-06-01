@@ -118,6 +118,10 @@ import java.util.*;
  * @since 1.5
  * @author Doug Lea
  */
+
+/**
+ * 主要用来在给定的延迟之后运行任务，或者定期执行任务
+ */
 public class ScheduledThreadPoolExecutor
         extends ThreadPoolExecutor
         implements ScheduledExecutorService {
@@ -177,13 +181,23 @@ public class ScheduledThreadPoolExecutor
         return System.nanoTime();
     }
 
+    /**
+     * futuretask在 ScheduledThreadPoolExecutor 中是 ScheduledFutureTask
+     * @param <V>
+     */
     private class ScheduledFutureTask<V>
             extends FutureTask<V> implements RunnableScheduledFuture<V> {
 
         /** Sequence number to break ties FIFO */
+        /**
+         * 任务序列号
+         */
         private final long sequenceNumber;
 
         /** The time the task is enabled to execute in nanoTime units */
+        /**
+         * 任务执行的时间单位是毫秒
+         */
         private long time;
 
         /**
@@ -192,18 +206,33 @@ public class ScheduledThreadPoolExecutor
          * indicates fixed-delay execution.  A value of 0 indicates a
          * non-repeating task.
          */
+        /**
+         * 重复执行任务的周期，正数表示固定周期执行，负数表示固定延时执行，0表示不是周期任务
+         */
         private final long period;
 
         /** The actual task to be re-enqueued by reExecutePeriodic */
+        /**
+         * this的包装任务，用于周期任务的提交
+         */
         RunnableScheduledFuture<V> outerTask = this;
 
         /**
          * Index into delay queue, to support faster cancellation.
          */
+        /**
+         * 延时队列的索引号
+         */
         int heapIndex;
 
         /**
          * Creates a one-shot action with given nanoTime-based trigger time.
+         */
+        /**
+         * 构造一个定时任务，在ns纳秒后执行，执行完成后结果为result
+         * @param r
+         * @param result
+         * @param ns
          */
         ScheduledFutureTask(Runnable r, V result, long ns) {
             super(r, result);
@@ -215,6 +244,13 @@ public class ScheduledThreadPoolExecutor
         /**
          * Creates a periodic action with given nano time and period.
          */
+        /**
+         * 比上一个多了一个周期性调度，每隔period纳秒执行一次
+         * @param r
+         * @param result
+         * @param ns
+         * @param period
+         */
         ScheduledFutureTask(Runnable r, V result, long ns, long period) {
             super(r, result);
             this.time = ns;
@@ -224,6 +260,11 @@ public class ScheduledThreadPoolExecutor
 
         /**
          * Creates a one-shot action with given nanoTime-based trigger time.
+         */
+        /**
+         * 构造一个Callable定时任务，在ns纳秒后执行
+         * @param callable
+         * @param ns
          */
         ScheduledFutureTask(Callable<V> callable, long ns) {
             super(callable);
@@ -832,6 +873,9 @@ public class ScheduledThreadPoolExecutor
          * identified by heapIndex.
          */
 
+        /**
+         * 初始化数组大小 （二叉堆）
+         */
         private static final int INITIAL_CAPACITY = 16;
         private RunnableScheduledFuture<?>[] queue =
             new RunnableScheduledFuture<?>[INITIAL_CAPACITY];
@@ -1002,6 +1046,11 @@ public class ScheduledThreadPoolExecutor
             }
         }
 
+        /**
+         * 元素添加操作
+         * @param x the element to add
+         * @return
+         */
         public boolean offer(Runnable x) {
             if (x == null)
                 throw new NullPointerException();
@@ -1071,6 +1120,11 @@ public class ScheduledThreadPoolExecutor
             }
         }
 
+        /**
+         * 元素取出操作
+         * @return
+         * @throws InterruptedException
+         */
         public RunnableScheduledFuture<?> take() throws InterruptedException {
             final ReentrantLock lock = this.lock;
             lock.lockInterruptibly();
