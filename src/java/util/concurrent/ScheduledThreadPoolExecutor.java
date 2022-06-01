@@ -221,6 +221,7 @@ public class ScheduledThreadPoolExecutor
          * Index into delay queue, to support faster cancellation.
          */
         /**
+         * 需要将任务按执行时间排序 （二叉树小顶堆实现的排序，通过数组实现二叉树小顶堆）
          * 延时队列的索引号
          */
         int heapIndex;
@@ -230,9 +231,6 @@ public class ScheduledThreadPoolExecutor
          */
         /**
          * 构造一个定时任务，在ns纳秒后执行，执行完成后结果为result
-         * @param r
-         * @param result
-         * @param ns
          */
         ScheduledFutureTask(Runnable r, V result, long ns) {
             super(r, result);
@@ -246,10 +244,6 @@ public class ScheduledThreadPoolExecutor
          */
         /**
          * 比上一个多了一个周期性调度，每隔period纳秒执行一次
-         * @param r
-         * @param result
-         * @param ns
-         * @param period
          */
         ScheduledFutureTask(Runnable r, V result, long ns, long period) {
             super(r, result);
@@ -263,8 +257,6 @@ public class ScheduledThreadPoolExecutor
          */
         /**
          * 构造一个Callable定时任务，在ns纳秒后执行
-         * @param callable
-         * @param ns
          */
         ScheduledFutureTask(Callable<V> callable, long ns) {
             super(callable);
@@ -363,6 +355,9 @@ public class ScheduledThreadPoolExecutor
      * @param task the task
      */
     private void delayedExecute(RunnableScheduledFuture<?> task) {
+        /**
+         * 判断线程池有没有关闭，如果关闭就拒绝任务
+         */
         if (isShutdown())
             reject(task);
         else {
@@ -439,6 +434,9 @@ public class ScheduledThreadPoolExecutor
      */
     protected <V> RunnableScheduledFuture<V> decorateTask(
         Runnable runnable, RunnableScheduledFuture<V> task) {
+        /**
+         * 返回自己 （钩子函数，用于扩展）
+         */
         return task;
     }
 
@@ -468,7 +466,16 @@ public class ScheduledThreadPoolExecutor
      * @throws IllegalArgumentException if {@code corePoolSize < 0}
      */
     public ScheduledThreadPoolExecutor(int corePoolSize) {
+        /**
+         * 直接调用父类 ThreadPoolExecutor 的构造方法
+         * 非核心线程数为 Integer.MAX_VALUE ，超时时间 0 ，即运行完就立即销毁
+         * 延时队列大小无上限，只有当队列装不下才会创建非核心线程数去处理，
+         * 所以 中间三个参数均不生效（maximumPoolSize、keepAliveTime，unit）
+         */
         super(corePoolSize, Integer.MAX_VALUE, 0, NANOSECONDS,
+                /**
+                 * 无构造器，所以是无界的
+                 */
               new DelayedWorkQueue());
     }
 
@@ -563,14 +570,29 @@ public class ScheduledThreadPoolExecutor
      * @throws RejectedExecutionException {@inheritDoc}
      * @throws NullPointerException       {@inheritDoc}
      */
+    /**
+     * 将任务放入线程池，延迟多久后执行
+     */
     public ScheduledFuture<?> schedule(Runnable command,
                                        long delay,
                                        TimeUnit unit) {
         if (command == null || unit == null)
             throw new NullPointerException();
+        /**
+         * RunnableScheduledFuture ：
+         * 可调度future
+         * 继承自RunnableFuture和ScheduledFuture
+         * ScheduledFuture接口 符合设计模式的接口隔离原则（继承 delayed 和 future）
+         *
+         * decorateTask（）为装饰器模式，装饰任务（对任务 command 增加一些新功能）
+         */
         RunnableScheduledFuture<?> t = decorateTask(command,
+                /**
+                 * 这个构造函数的创建为非周期任务
+                 */
             new ScheduledFutureTask<Void>(command, null,
                                           triggerTime(delay, unit)));
+
         delayedExecute(t);
         return t;
     }
@@ -596,6 +618,15 @@ public class ScheduledThreadPoolExecutor
      * @throws NullPointerException       {@inheritDoc}
      * @throws IllegalArgumentException   {@inheritDoc}
      */
+    /**
+     * 周期执行
+     * 只依赖任务开始执行时间，不依赖于任务本身执行的时间（比如每隔2s执行一次，2s后上个任务没执行完成也会继续执行新任务）
+     * @param command the task to execute
+     * @param initialDelay  初始延迟（延迟多久才开始执行第一个任务）
+     * @param period 每隔多久执行一次
+     * @param unit  period 的 时间单位
+     * @return
+     */
     public ScheduledFuture<?> scheduleAtFixedRate(Runnable command,
                                                   long initialDelay,
                                                   long period,
@@ -619,6 +650,15 @@ public class ScheduledThreadPoolExecutor
      * @throws RejectedExecutionException {@inheritDoc}
      * @throws NullPointerException       {@inheritDoc}
      * @throws IllegalArgumentException   {@inheritDoc}
+     */
+    /**
+     *
+     * @param command the task to execute
+     * @param initialDelay the time to delay first execution
+     * @param delay the delay between the termination of one
+     * execution and the commencement of the next
+     * @param unit the time unit of the initialDelay and delay parameters
+     * @return
      */
     public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command,
                                                      long initialDelay,

@@ -44,5 +44,11 @@ package java.util.concurrent;
  * @author Doug Lea
  * @param <V> The result type returned by this Future
  */
+
+/**
+ * 符合设计模式接口隔离原则
+ * 继承 delayed 和 future
+ * @param <V>
+ */
 public interface ScheduledFuture<V> extends Delayed, Future<V> {
 }

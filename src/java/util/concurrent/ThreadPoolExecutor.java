@@ -1539,6 +1539,16 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * @throws NullPointerException     if {@code workQueue}
      *                                  or {@code threadFactory} or {@code handler} is null
      */
+
+    /**
+     * @param corePoolSize 核心线程数
+     * @param maximumPoolSize 最大线程数
+     * @param keepAliveTime 超时时间
+     * @param unit 时间单位
+     * @param workQueue  只有当队列满后才会创建非核心线程数去处理任务
+     * @param threadFactory 线程工厂
+     * @param handler 拒绝策略
+     */
     public ThreadPoolExecutor(int corePoolSize,
                               int maximumPoolSize,
                               long keepAliveTime,
