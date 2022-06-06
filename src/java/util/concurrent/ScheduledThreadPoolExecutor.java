@@ -1183,6 +1183,7 @@ public class ScheduledThreadPoolExecutor
 
         /**
          * 元素取出操作
+         * 最小堆存储在队列中，每次take拿到最先执行的延时任务
          * @return
          * @throws InterruptedException
          */
@@ -1207,7 +1208,8 @@ public class ScheduledThreadPoolExecutor
                         first = null; // don't retain ref while waiting
                         /**
                          * 此处需要leader是因为：
-                         *      如果有10个线程进来，若没有leader 则 10个线程会同时唤醒该任务，不合理
+                         *      如果有10个线程进来，若没有leader 则 10个线程会从对队列中取10个任务并等待到达执行时间后唤醒任务，不合理
+                         *      （因为队列存储的数据结构为最小堆，take时候拿到最近最先要被执行的任务，所以不要太多线程同时去等待拿任务）
                          */
                         if (leader != null)
                             available.await();
