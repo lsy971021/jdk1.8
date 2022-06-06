@@ -339,6 +339,9 @@ public class ScheduledThreadPoolExecutor
      */
     boolean canRunInCurrentRunState(boolean periodic) {
         return isRunningOrShutdown(periodic ?
+                /**
+                 * 觉得是否在线程池shutdown状态下执行
+                 */
                                    continueExistingPeriodicTasksAfterShutdown :
                                    executeExistingDelayedTasksAfterShutdown);
     }
@@ -354,6 +357,11 @@ public class ScheduledThreadPoolExecutor
      *
      * @param task the task
      */
+    /**
+     * 最终执行任务参照threadPoolExecutor的运行方法
+     * @see ThreadPoolExecutor#runWorker(Worker)
+     * @param task
+     */
     private void delayedExecute(RunnableScheduledFuture<?> task) {
         /**
          * 判断线程池有没有关闭，如果关闭就拒绝任务
@@ -361,12 +369,23 @@ public class ScheduledThreadPoolExecutor
         if (isShutdown())
             reject(task);
         else {
+            /**
+             * 添加到队列里
+             */
             super.getQueue().add(task);
             if (isShutdown() &&
+                    /**
+                     * task.isPeriodic() ：是否为周期性调度任务
+                     * canRunInCurrentRunState（） ：能否在当前状态线运行
+                     * remove（） ：如果不能在当前状态下执行 从队列中移除任务
+                     */
                 !canRunInCurrentRunState(task.isPeriodic()) &&
                 remove(task))
                 task.cancel(false);
             else
+            /**
+             * 此时，确保线程池已经开启了 执行ensurePrestart（）
+             */
                 ensurePrestart();
         }
     }
@@ -592,7 +611,9 @@ public class ScheduledThreadPoolExecutor
                  */
             new ScheduledFutureTask<Void>(command, null,
                                           triggerTime(delay, unit)));
-
+        /**
+         * 执行任务
+         */
         delayedExecute(t);
         return t;
     }
@@ -1174,10 +1195,20 @@ public class ScheduledThreadPoolExecutor
                     if (first == null)
                         available.await();
                     else {
+                        /**
+                         * getDelay() 延迟时间减去当前时间（纳秒） = 还有多长时间执行
+                         */
                         long delay = first.getDelay(NANOSECONDS);
+                        /**
+                         * 若超时时 即 任务到时间可以执行了，把任务取走并当前线程退出去for循环，并在最下面finally唤醒一个线程继续执行for循环
+                         */
                         if (delay <= 0)
                             return finishPoll(first);
                         first = null; // don't retain ref while waiting
+                        /**
+                         * 此处需要leader是因为：
+                         *      如果有10个线程进来，若没有leader 则 10个线程会同时唤醒该任务，不合理
+                         */
                         if (leader != null)
                             available.await();
                         else {
@@ -1193,7 +1224,13 @@ public class ScheduledThreadPoolExecutor
                     }
                 }
             } finally {
+                /**
+                 * 队列中有任务
+                 */
                 if (leader == null && queue[0] != null)
+                /**
+                 * 唤醒一个线程
+                 */
                     available.signal();
                 lock.unlock();
             }
