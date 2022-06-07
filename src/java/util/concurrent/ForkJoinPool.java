@@ -808,6 +808,9 @@ public class ForkJoinPool extends AbstractExecutorService {
         int top;                   // index of next slot for push
         ForkJoinTask<?>[] array;   // the elements (initially unallocated)
         final ForkJoinPool pool;   // the containing pool (may be null)
+        /**
+         * 内部工作队列
+         */
         final ForkJoinWorkerThread owner; // owning thread or null if shared
         volatile Thread parker;    // == owner during call to park; else null
         volatile ForkJoinTask<?> currentJoin;  // task being joined in awaitJoin
